@@ -447,6 +447,17 @@ class TVMPODValue_ {
       return nullptr;
     }
   }
+  operator DLManagedTensor*() const {
+    if (type_code_ == kManagedArrayHandle) {
+      return static_cast<DLManagedTensor*>(value_.v_handle);
+    } else {
+      if (type_code_ == kNull) return nullptr;
+      LOG(FATAL) << "Expected "
+                 << "DLManagedTensor* but got "
+                 << TypeCode2Str(type_code_);
+      return nullptr;
+    }
+  }
   operator NDArray() const {
     if (type_code_ == kNull) return NDArray();
     TVM_CHECK_TYPE_CODE(type_code_, kNDArrayContainer);
@@ -881,6 +892,7 @@ inline const char* TypeCode2Str(int type_code) {
     case kNull: return "NULL";
     case kNodeHandle: return "NodeHandle";
     case kArrayHandle: return "ArrayHandle";
+    case kManagedArrayHandle: return "ManagedArrayHandle";
     case kTVMType: return "TVMType";
     case kTVMContext: return "TVMContext";
     case kFuncHandle: return "FunctionHandle";
@@ -1051,6 +1063,10 @@ class TVMArgsSetter {
   void operator()(size_t i, DLTensor* value) const {
     values_[i].v_handle = value;
     type_codes_[i] = kArrayHandle;
+  }
+  void operator()(size_t i, DLManagedTensor* value) const {
+    values_[i].v_handle = value;
+    type_codes_[i] = kManagedArrayHandle;
   }
   void operator()(size_t i, TVMContext value) const {
     values_[i].v_ctx = value;

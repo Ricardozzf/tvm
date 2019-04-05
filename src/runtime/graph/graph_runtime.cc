@@ -77,6 +77,13 @@ void GraphRuntime::SetInput(int index, DLTensor* data_in) {
   uint32_t eid = this->entry_id(input_nodes_[index], 0);
   data_entry_[eid].CopyFrom(data_in);
 }
+
+void GraphRuntime::SetInputZC(int index, DLManagedTensor* data_in) {
+  CHECK_LT(static_cast<size_t>(index), input_nodes_.size());
+  uint32_t eid = this->entry_id(input_nodes_[index], 0);
+  data_entry_[eid] = NDArray::FromDLPack(data_in);
+}
+
 /*!
  * \brief Get the number of outputs
  *
@@ -320,6 +327,15 @@ PackedFunc GraphRuntime::GetFunction(
           if (in_idx >= 0) this->SetInput(in_idx, args[1]);
         } else {
           this->SetInput(args[0], args[1]);
+        }
+      });
+  } else if (name == "set_input_zero_copy") {
+    return PackedFunc([sptr_to_self, this](TVMArgs args, TVMRetValue* rv) {
+        if (args[0].type_code() == kStr) {
+          int in_idx = this->GetInputIndex(args[0]);
+          if (in_idx >= 0) this->SetInputZC(in_idx, args[1]);
+        } else {
+          this->SetInputZC(args[0], args[1]);
         }
       });
   } else if (name == "get_output") {

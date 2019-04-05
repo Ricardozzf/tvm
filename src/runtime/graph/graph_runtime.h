@@ -92,6 +92,7 @@ class GraphRuntime : public ModuleNode {
    * \param data_in The input data.
    */
   void SetInput(int index, DLTensor* data_in);
+  void SetInputZC(int index, DLManagedTensor* data_in);
   /*!
    * \brief Get the number of outputs
    *
