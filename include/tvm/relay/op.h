@@ -260,7 +260,7 @@ class TVM_DLL OpRegistry {
   /*! \brief The operator */
   Op op_;
   // private constructor
-  OpRegistry();
+  TVM_DLL OpRegistry();
   // return internal pointer to op.
   inline OpNode* get();
   // update the attribute OpMap

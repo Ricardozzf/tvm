@@ -60,7 +60,7 @@ def onnx_storage_order2layout(storage_order):
     if storage_order not in (0, 1):
         raise tvm.error.OpAttributeInvalid('Mode of storage_order must be either 0 or 1')
 
-    return 'NCHW' if sotrage_order == 0 else 'NHWC'
+    return 'NCHW' if storage_order == 0 else 'NHWC'
 
 
 def dimension_constraint():
@@ -850,6 +850,18 @@ class ConstantFill(OnnxOpConverter):
             shape = shape + attr.pop('extra_shape')
         return _op.full(inputs[0], shape)
 
+class Sign(OnnxOpConverter):
+    """ Operator converter for Sign.
+    """
+    @classmethod
+    def _impl_v1(cls, inputs, attr, params):
+        return _op.sign(inputs[0])
+
+class Equal(Elemwise):
+    """ Operator converter for Equal.
+    """
+    name = 'equal'
+
 # compatible operators that do NOT require any conversion.
 _identity_list = []
 
@@ -964,6 +976,8 @@ def _get_convert_map(opset):
         'Unsqueeze': Unsqueeze.get_converter(opset),
         'Pad': Pad.get_converter(opset),
         'Shape': Shape.get_converter(opset),
+        'Sign': Sign.get_converter(opset),
+        'Equal': Equal.get_converter(opset)
     }
 
 

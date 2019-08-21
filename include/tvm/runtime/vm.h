@@ -36,6 +36,9 @@ namespace tvm {
 namespace runtime {
 namespace vm {
 
+/*! \brief Magic number for NDArray list file  */
+constexpr uint64_t kTVMNDArrayListMagic = 0xF7E58D4F05049CB7;
+
 /*! \brief A register name. */
 using RegName = int64_t;
 
@@ -103,7 +106,7 @@ struct Instruction {
       /*! \brief The register containing the closure. */
       RegName closure;
       /*! \brief The number of arguments to the closure. */
-      Index closure_args_num;
+      Index num_closure_args;
       /*! \brief The closure arguments as an array. */
       RegName* closure_args;
     };
@@ -115,7 +118,7 @@ struct Instruction {
       /*! \brief The source register for a move operation. */
       RegName from;
     };
-    struct /* Packed Operands */ {
+    struct /* InvokePacked Operands */ {
       /*! \brief The index into the packed function table. */
       Index packed_index;
       /*! \brief The arity of the packed function. */
@@ -149,7 +152,7 @@ struct Instruction {
     };
     struct /* LoadConsti Operands */ {
       /* \brief The index into the constant pool. */
-      size_t val;
+      Index val;
     } load_consti;
     struct /* Jump Operands */ {
       /*! \brief The jump offset. */
@@ -284,7 +287,7 @@ struct Instruction {
    *  \param dst The destination register.
    *  \return The load_constanti instruction.
    */
-  static Instruction LoadConsti(size_t val, RegName dst);
+  static Instruction LoadConsti(Index val, RegName dst);
   /*! \brief Construct a move instruction.
    *  \param src The source register.
    *  \param dst The destination register.
@@ -372,13 +375,48 @@ struct VMFrame {
  */
 class VirtualMachine : public runtime::ModuleNode {
  public:
-  PackedFunc GetFunction(const std::string& name,
-                         const std::shared_ptr<ModuleNode>& sptr_to_self) final;
+  /*!
+   * \brief Get a PackedFunc from module.
+   *
+   *  The PackedFunc may not be fully initialized,
+   *  there might still be first time running overhead when
+   *  executing the function on certain devices.
+   *  For benchmarking, use prepare to eliminate
+   *
+   * \param name the name of the function.
+   * \param sptr_to_self The shared_ptr that points to this module node.
+   *
+   * \return PackedFunc(nullptr) when it is not available.
+   *
+   * \note The function will always remain valid.
+   *   If the function needs resource from the module(e.g. late linking),
+   *   it should capture sptr_to_self.
+   */
+  virtual PackedFunc GetFunction(const std::string& name,
+                                 const std::shared_ptr<ModuleNode>& sptr_to_self);
+
+  /*!
+   * \brief Invoke a PackedFunction
+   *
+   * \param packed_index The offset of the PackedFunction in all functions.
+   * \param func The PackedFunction to be invoked.
+   * \param arg_count The number of arguments to the PackedFunction.
+   * \param output_size The number of outputs of the PackedFunction.
+   * \param args Arguments to the PackedFunction.
+   *
+   * \note The return value will be stored in the last output_size slots of args.
+   */
+  virtual void InvokePacked(Index packed_index, const PackedFunc& func, Index arg_count,
+                            Index output_size, const std::vector<Object>& args);
+
+  virtual ~VirtualMachine() {}
 
   const char* type_key() const final {
     return "VirtualMachine";
   }
 
+  /*! \brief The runtime module/library that contains generated code. */
+  runtime::Module lib;
   /*! \brief The virtual machine's packed function table. */
   std::vector<PackedFunc> packed_funcs;
   /*! \brief The virtual machine's function table. */
@@ -446,11 +484,29 @@ class VirtualMachine : public runtime::ModuleNode {
    *  \param contexts The set of TVM contexts.
    */
   void Init(const std::vector<TVMContext>& contexts);
-  void Run();
+
+  /*! \brief Run VM dispatch loop.
+   */
+  void RunLoop();
+
+  /*! \brief Get device context for params.
+   */
+  TVMContext GetParamsContext() const;
+
+  /*!
+   * \brief Load parameters from the parameter bytearray.
+   * \param params The binary file that contains parameters.
+   */
+  void LoadParams(const std::string& params);
 
   /*! \brief A map from globals (as strings) to their index in the function map.
    */
   std::unordered_map<std::string, Index> global_map;
+
+  /*! \brief A mapping from the packed function (as string) to the index that
+   * corresponds to the position of the `packed_funcs` list.
+   */
+  std::unordered_map<std::string, Index> primitive_map;
 
  private:
   /*! \brief Invoke a global setting up the VM state to execute.
@@ -458,6 +514,10 @@ class VirtualMachine : public runtime::ModuleNode {
    * This does not begin execution of the VM.
    */
   void InvokeGlobal(const VMFunction& func, const std::vector<Object>& args);
+
+
+  /*! \brief The parameter name to data mapping. */
+  std::unordered_map<std::string, Object> params_;
 };
 
 }  // namespace vm
