@@ -41,6 +41,20 @@ class StrAttrsDict(object):
     def __init__(self, attrs):
         self.attrs = attrs
 
+    def has_attr(self, key):
+        """Checks if a attribute is present in the map.
+
+        Parameters
+        ----------
+        key : str
+            The attribute key
+
+        Returns
+        -------
+        bool : True if the key is present in the attributes else false.
+        """
+        return key in self.attrs
+
     def get_float(self, key, default=RequiredAttr()):
         """Get float attribute
 
@@ -124,16 +138,8 @@ class StrAttrsDict(object):
         """
         if key in self.attrs:
             tshape = self.attrs[key]
-            ret = []
-            for x in tshape.strip('()[]').split(','):
-                x = x.strip()
-                if not x:
-                    continue
-                if x == "None":
-                    ret.append(None)
-                else:
-                    ret.append(int(x))
-            return tuple(ret)
+            return tuple(int(x) if x.strip("- ").isdigit() else None
+                         for x in tshape.strip('()[]').split(',') if x)
         if isinstance(default, RequiredAttr):
             raise AttributeError("Required attribute {} not found.".format(key))
         return default
